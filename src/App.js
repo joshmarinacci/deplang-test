@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import ohm  from 'ohm-js'
+import Graph from "./Graph"
 import './App.css';
 
 const grammar = ohm.grammar(`
@@ -61,55 +62,6 @@ const PREDEFINED_FUNCTIONS = {
     },
 }
 
-
-class Graph {
-    constructor() {
-        this.objs = {}
-        this.SYMBOLS = {}
-    }
-    makeInteractive(name,value) { return this.makeLiteral(name,value)  }
-    genID(prefix) { return prefix + Math.floor(Math.random() * 10000) }
-
-    makeObj(obj) {
-        obj.id = this.genID(obj.type)
-        obj.inputs = {}
-        obj.graph = this
-        this.objs[obj.id] = obj
-        return obj
-    }
-    makeLiteral(name,value) {   return this.makeObj({ name:name, type:'literal',   value:value, }) }
-    makeSymbolReference(name) { return this.makeObj({ name:name, type:'symbolref', value:name   }) }
-    makeExpression(name) {      return this.makeObj({ name:name, type:'expression'              }) }
-    makeAssignment(name) {      return this.makeObj({ name:name, type:'assignment'              }) }
-
-    add(src,dst,name) { dst.inputs[name] = src  }
-    setFunction(obj,fun) {  obj.fun = fun }
-    setValue(obj,value) { obj.value = value  }
-    findByName(name) {  return Object.values(this.objs).find((obj)=>obj.name === name)  }
-
-    dump() {
-        console.log("=== object graph dump ===")
-        Object.keys(this.objs).forEach((id)=>{
-            const obj = this.objs[id]
-            if(obj.type === 'literal')
-                return console.log(`Literal:: ${obj.name} is ${obj.value}`)
-            if(obj.type === 'symbolref') {
-                return console.log(`Symbol ref::${obj.name}`)
-            }
-            const outp = Object.keys(obj.inputs).map((key)=>{
-                const val = obj.inputs[key]
-                let str = val.toString()
-                if(val.type === 'literal') str = val.value
-                if(val.type === 'symbolref') str = '@' + val.name
-                if(val.type === 'expression') str = '$' + val.name
-                return key + " : " + str
-            })
-            console.log(`Object:: ${obj.name} (${outp.join(", ")})`)
-        })
-        console.log("=== ===")
-    }
-}
-
 function makeToGraphSemantics(graph, grammar) {
     return grammar.createSemantics().addOperation('toGraph', {
         Number: (a) => graph.makeLiteral(a.sourceString,parseInt(a.sourceString,10)),
@@ -125,15 +77,27 @@ function makeToGraphSemantics(graph, grammar) {
             return expr
         },
         Statement: function(first, _, rest) {
-            const rest_n = rest.toGraph()
-            rest_n.reduce((first,next)=>{
+            const ret = {
+                type:'statement',
+                first:first.toGraph(),
+                rest:rest.toGraph(),
+            }
+            // const rest_n = rest.toGraph()
+            ret.rest.reduce((first,next)=>{
                 if(next.type === 'symbolref') graph.SYMBOLS[next.name] = first
                 if(next.type === 'expression') graph.add(first,next,'input')
                 return next
-            },first.toGraph())
-            if(rest_n.length > 0) {
-                console.log("returning", rest_n[rest_n.length-1])
-                return rest_n[rest_n.length-1]
+            },ret.first)
+            return ret
+            // if(rest_n.length > 0) {
+            //     console.log("returning", rest_n[rest_n.length-1])
+            //     return rest_n[rest_n.length-1]
+            // }
+        },
+        Block: function(statements) {
+            return {
+                type:'block',
+                statements: statements.toGraph()
             }
         }
     })
@@ -150,17 +114,36 @@ function resolveValue(node) {
             })
         })
     }
-    return new Promise((res,rej)=>{
-        //it must be an expression
-        const proms = Object.keys(node.inputs).map((key)=> resolveValue(node.inputs[key]))
-        return Promise.all(proms).then((rets)=>{
-            const args = {}
-            Object.keys(node.inputs).forEach((key,i)=> args[key] = rets[i])//resolveValue(node.inputs[key]))
-            const fun = PREDEFINED_FUNCTIONS[node.name]
-            if(fun) res(fun(null, args))
-            rej(new Error("no defined function",node.name))
+    if(node.type === 'block') {
+        console.log("it's a block. do the last statement.")
+        const last = node.statements[node.statements.length-1]
+        console.log("last is", last.type)
+        return resolveValue(last)
+    }
+    if(node.type === 'statement') {
+        console.log("its a statement",node)
+        if(node.rest.length > 0) {
+            const last = node.rest[node.rest.length-1]
+            console.log("last is",last)
+            return resolveValue(last)
+        }
+
+    }
+    if(node.type === 'expression') {
+        return new Promise((res, rej) => {
+            //it must be an expression
+            const proms = Object.keys(node.inputs).map((key) => resolveValue(node.inputs[key]))
+            return Promise.all(proms).then((rets) => {
+                const args = {}
+                Object.keys(node.inputs).forEach((key, i) => args[key] = rets[i])//resolveValue(node.inputs[key]))
+                const fun = PREDEFINED_FUNCTIONS[node.name]
+                if (fun) res(fun(null, args))
+                rej(new Error("no defined function", node.name))
+            })
         })
-    })
+    }
+
+    console.log("ERROR: unrecognized type",node.type)
 }
 
 const src = `
@@ -172,7 +155,7 @@ const src = `
         => Draw ( shapes:circle2 ) 
 `
 
-class App extends Component {
+class InputPanel extends Component {
     constructor(props) {
         super(props)
         this.state = {
@@ -181,7 +164,6 @@ class App extends Component {
             graph:null,
         }
     }
-
     evaluate = () =>{
         console.log("evaluating",this.state.source)
         const graph = new Graph()
@@ -189,10 +171,10 @@ class App extends Component {
         const match = grammar.match(this.state.source)
         const ret = sem(match).toGraph()
         const last = ret[ret.length-1]
-        console.log("got the output",last)
+        console.log("got the output",ret)
         this.setState({
             graph:graph,
-            value:last
+            value:ret
         })
     }
     edited = (e)=> this.setState({source:e.target.value})
@@ -203,10 +185,10 @@ class App extends Component {
         }
     }
     render() {
-        console.log("rendering")
         return (
-            <div id="main">
-                <textarea value={this.state.source} onChange={this.edited}
+            <div className={'input-panel'}>
+                <textarea value={this.state.source}
+                          onChange={this.edited}
                           rows={10} cols={80}
                           onKeyDown={this.keypressed}
                 />
@@ -217,15 +199,21 @@ class App extends Component {
     }
 }
 
-class OutputPanel extends Component {
-    constructor(props) {
-        super(props)
+class App extends Component {
+    render() {
+        return <div id="main">
+            <InputPanel key="1"/>
+            <InputPanel key="2"/>
+        </div>
     }
+}
+
+class OutputPanel extends Component {
     componentWillMount() {
-        console.log("mounting")
+        // console.log("mounting")
     }
     componentWillUnmount() {
-        console.log("unmounting")
+        // console.log("unmounting")
     }
     shouldComponentUpdate() {
         return false
@@ -242,6 +230,12 @@ class OutputPanel extends Component {
             }
             if(props.value.type === 'expression') {
                 console.log("must resolve an expression")
+                resolveValue(props.value).then((val)=>{
+                    console.log("got the real value",val,this.div)
+                    this.renderResult(val)
+                })
+            }
+            if(props.value.type === 'block') {
                 resolveValue(props.value).then((val)=>{
                     console.log("got the real value",val,this.div)
                     this.renderResult(val)
@@ -265,3 +259,53 @@ class OutputPanel extends Component {
 
 export default App;
 
+// function doTest() {
+//     const graph = new Graph()
+//     console.log('before',graph.getObjectCount())
+//     const code = `'blue'=>BLUE`
+//     console.log("code is",code)
+//     const sem = makeToGraphSemantics(graph,grammar)
+//     const match = grammar.match(code)
+//     const ret = sem(match).toGraph()
+//     console.log('return value is', ret)
+//     console.log('after',graph.getObjectCount())
+//     const objs = new Set()
+//     collectObjects(ret, objs)
+//     console.log("collected",objs)
+// }
+
+// function collectObjects(root, objs) {
+//     console.log("type = ", root.type)
+//     if(root.type === 'block') {
+//         root.statements.forEach((n)=>collectObjects(n,objs))
+//     }
+//     if(root.type === 'statement') {
+//         collectObjects(root.first,objs)
+//         root.rest.forEach(n=>collectObjects(n,objs))
+//     }
+//     if(root.type === 'literal') {
+//         objs.add(root)
+//     }
+//     if(root.type === 'symbolref') {
+//         objs.add(root)
+//     }
+// }
+
+// doTest()
+
+
+/*
+Slider(min:0, max:10) => A
+A+5 => C
+
+make a block renderer to track each text area block of code
+also listens to changes on the graph
+also tracks the nodes created for that block
+when re-evaluating that block, remove the nodes, then evaluate the new ones.
+after evaluation, draw the output of the eval, which could be a number, string, canvas, or UI control
+after eval and re-render, need to tell everything else attached to the graph to re-evaluate lazily.
+
+
+
+
+*/
