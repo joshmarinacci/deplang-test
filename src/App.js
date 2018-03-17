@@ -60,6 +60,17 @@ const PREDEFINED_FUNCTIONS = {
         console.log("  image", args.input)
         return { type:'save-output'}
     },
+    'Slider': function(ctx, args) {
+        console.log("making a slider")
+        return {
+            type:'input',
+            kind:'slider',
+            min:0,
+            max:100,
+            value: 20,
+            targetNode:ctx.node.id
+        }
+    }
 }
 
 function makeToGraphSemantics(graph, grammar) {
@@ -115,16 +126,16 @@ function resolveValue(node) {
         })
     }
     if(node.type === 'block') {
-        console.log("it's a block. do the last statement.")
+        // console.log("it's a block. do the last statement.")
         const last = node.statements[node.statements.length-1]
-        console.log("last is", last.type)
+        // console.log("last is", last.type)
         return resolveValue(last)
     }
     if(node.type === 'statement') {
-        console.log("its a statement",node)
+        // console.log("its a statement",node)
         if(node.rest.length > 0) {
             const last = node.rest[node.rest.length-1]
-            console.log("last is",last)
+            // console.log("last is",last)
             return resolveValue(last)
         }
 
@@ -137,7 +148,8 @@ function resolveValue(node) {
                 const args = {}
                 Object.keys(node.inputs).forEach((key, i) => args[key] = rets[i])//resolveValue(node.inputs[key]))
                 const fun = PREDEFINED_FUNCTIONS[node.name]
-                if (fun) res(fun(null, args))
+                console.log("calling function with node",node.id)
+                if (fun) res(fun({node:node}, args))
                 rej(new Error("no defined function", node.name))
             })
         })
@@ -159,7 +171,7 @@ class InputPanel extends Component {
     constructor(props) {
         super(props)
         this.state = {
-            source:src,
+            source:`Slider(value:50)=>A`,
             output:'nothing',
             graph:null,
         }
@@ -203,57 +215,73 @@ class App extends Component {
     render() {
         return <div id="main">
             <InputPanel key="1"/>
-            <InputPanel key="2"/>
+            {/*<InputPanel key="2"/>*/}
         </div>
     }
 }
 
 class OutputPanel extends Component {
+    constructor(props) {
+        super(props)
+        this.state = {
+            value: null
+        }
+    }
     componentWillMount() {
         // console.log("mounting")
     }
     componentWillUnmount() {
         // console.log("unmounting")
     }
-    shouldComponentUpdate() {
-        return false
-    }
     componentWillReceiveProps(props) {
         console.log("got new props", props)
         if(props.value) {
-            if(props.value.type === 'symbolref') {
-                console.log("can resolve")
-                resolveValue(props.value).then((val)=>{
-                    console.log("got the real value",val,this.div)
-                    this.renderResult(val)
-                })
-            }
-            if(props.value.type === 'expression') {
-                console.log("must resolve an expression")
-                resolveValue(props.value).then((val)=>{
-                    console.log("got the real value",val,this.div)
-                    this.renderResult(val)
-                })
-            }
-            if(props.value.type === 'block') {
-                resolveValue(props.value).then((val)=>{
-                    console.log("got the real value",val,this.div)
-                    this.renderResult(val)
-                })
-            }
+            resolveValue(props.value).then((val) =>{
+                this.setState({value:val})
+            })
+            // if(props.value.type === 'symbolref') {
+            //     console.log("can resolve")
+            //     resolveValue(props.value).then((val)=>{
+            //         console.log("got the real value",val,this.div)
+            //         this.renderResult(val)
+            //     })
+            // }
+            // if(props.value.type === 'expression') {
+            //     console.log("must resolve an expression")
+            //     resolveValue(props.value).then((val)=>{
+            //         console.log("got the real value",val,this.div)
+            //         this.renderResult(val)
+            //     })
+            // }
+            // if(props.value.type === 'block') {
+            //     resolveValue(props.value).then((val)=>{
+            //         console.log("got the real value",val,this.div)
+            //         this.renderResult(val)
+            //     })
+            // }
         }
     }
-    renderResult(val) {
-        while(this.div.firstChild) {
-            this.div.removeChild(this.div.firstChild)
-        }
-        console.log("rendering",val, val instanceof Element)
-        if(val instanceof Element) {
-            this.div.appendChild(val)
-        }
+    // renderResult(val) {
+    //     while(this.div.firstChild) {
+    //         this.div.removeChild(this.div.firstChild)
+    //     }
+    //     // console.log("rendering",val, val instanceof Element)
+    //     if(val instanceof Element) {
+    //         this.div.appendChild(val)
+    //     }
+    // }
+
+    updatedSlider= (e) => {
+        console.log("new value is",parseFloat(e.target.value))
+        console.log("need to update", this.props.value)
+        console.log("the input is", this.state.value)
     }
     render() {
-        return <div ref={(div)=>this.div = div}></div>
+        console.log("renderings",this.state.value)
+        if(this.state.value && this.state.value.type === 'input') {
+            return <input type="range" value={10} min={0} max={20} onChange={this.updatedSlider}/>
+        }
+        return <div>nothing</div>
     }
 }
 
@@ -304,6 +332,30 @@ also tracks the nodes created for that block
 when re-evaluating that block, remove the nodes, then evaluate the new ones.
 after evaluation, draw the output of the eval, which could be a number, string, canvas, or UI control
 after eval and re-render, need to tell everything else attached to the graph to re-evaluate lazily.
+
+
+
+---
+8 => A
+---
+9 => B
+add(A,B)
+---
+
+
+* create graph. stored at the app level and passed into the input panel as a prop
+* evaluate the first block. creates literal and symbolref nodes
+* evaluate the second block. creates the literal and symbolref nodes, and expression node
+* send to output panel
+* resolves the value for the second block. produces the literal number 15
+* render the 15 in the output panel's output
+* edit the second block and evaluate.
+* remove the previous literal and symbolref nodes
+* add new literal and symbol ref nodes
+* mark that the graph has changed
+* second output panel is notified of a change. resolves the value again. should get a new value.
+
+
 
 
 

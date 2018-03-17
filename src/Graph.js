@@ -1,8 +1,9 @@
-export default class Graph {
+class Graph {
     constructor() {
         this.objs = {}
         this.SYMBOLS = {}
         this.count = 0
+        this.listeners = []
     }
     makeInteractive(name,value) { return this.makeLiteral(name,value)  }
     genID(prefix) { return prefix + Math.floor(Math.random() * 10000) }
@@ -23,6 +24,14 @@ export default class Graph {
     add(src,dst,name) { dst.inputs[name] = src  }
     setFunction(obj,fun) {  obj.fun = fun }
     setValue(obj,value) { obj.value = value  }
+    setSymbolValue(name,value) {
+        // console.log("currently symbol is", this.SYMBOLS[name])
+        this.SYMBOLS[name] = value
+        this.listeners.forEach((l)=>l(this))
+    }
+    onChange(l) {
+        this.listeners.push(l)
+    }
     findByName(name) {  return Object.values(this.objs).find((obj)=>obj.name === name)  }
 
     dump() {
@@ -52,3 +61,5 @@ export default class Graph {
         return this.count
     }
 }
+
+module.exports = Graph

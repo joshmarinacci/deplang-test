@@ -8,7 +8,8 @@
   "dependencies": {
     "ohm-js": "^0.14.0",
     "react": "^16.2.0",
-    "react-dom": "^16.2.0"
+    "react-dom": "^16.2.0",
+    "tape": "^4.9.0"
   },
   "scripts": {
     "start": "react-scripts start",
