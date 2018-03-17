@@ -12,6 +12,9 @@ class Graph {
         obj.id = this.genID(obj.type)
         obj.inputs = {}
         obj.graph = this
+        obj.toString = function() {
+            return 'Obj:'+this.name+":"+this.type +(this.value?':'+this.value:"")
+        }
         this.objs[obj.id] = obj
         this.count++
         return obj
@@ -27,6 +30,9 @@ class Graph {
     setSymbolValue(name,value) {
         // console.log("currently symbol is", this.SYMBOLS[name])
         this.SYMBOLS[name] = value
+        this.listeners.forEach((l)=>l(this))
+    }
+    markNodeDirty(node) {
         this.listeners.forEach((l)=>l(this))
     }
     onChange(l) {
@@ -54,6 +60,11 @@ class Graph {
             console.log(`Object:: ${obj.name} (${outp.join(", ")})`)
         })
         console.log("=== ===")
+    }
+    dumpSymbols() {
+        console.log("=== symbol table ===")
+        Object.keys(this.SYMBOLS).forEach((name)=>console.log(`${name} = ${this.SYMBOLS[name]}`))
+        console.log("=== ====== ===== ===")
     }
 
 

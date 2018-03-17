@@ -146,6 +146,30 @@ const PREDEFINED_FUNCTIONS = {
             type:'literal',
             value:args.op1 + args.op2
         }
+    },
+    'Random': function(ctx,args) {
+        console.log('generating a random number')
+        return {
+            type:'literal',
+            value:Math.random()
+        }
+    }
+}
+
+
+const STARTABLE = {
+    'Random':{
+        start: function(node) {
+            console.log("starting the random stream",node)
+            this.intervalid = setInterval(function(){
+                console.log('triggering')
+                node.graph.markNodeDirty(node)
+            },1000)
+        },
+        stop: function() {
+            console.log("stopping the random stream")
+            clearInterval(this.intervalid)
+        }
     }
 }
 
@@ -231,15 +255,15 @@ function toGraph(graph, ast, set) {
     }
     if(ast.type === 'statement') {
         const rets = ast.parts.map((a)=>toGraph(graph,a,set))
-        console.log("need to bind the statement",ast.parts.length)
-        if(ast.parts.length >= 2) {
-            for(let i=0; i<ast.parts.length-1; i++) {
-                const A = ast.parts[i]
-                const B = ast.parts[i+1]
-                console.log("adding connection for ",A,' => ',B)
-                if(B.type === 'identifier') {
+        console.log("need to bind the statement",rets.length)
+        if(rets.length >= 2) {
+            for(let i=0; i<rets.length-1; i++) {
+                const A = rets[i]
+                const B = rets[i+1]
+                console.log(`adding connection for ${A} => ${B} `)
+                if(B.type === 'identifier' || B.type === 'symbolref') {
                     graph.SYMBOLS[B.value] = A
-                    console.log(`setting the symbol ${B.value} to `, A)
+                    console.log(`setting the symbol ${B.value} to ${A}`)
                 }
             }
         }
@@ -286,12 +310,11 @@ function resolveValue(node) {
     if(node.type === 'literal') return Promise.resolve(node.value)
     if(node.type === 'symbolref') {
         return new Promise((res,rej)=>{
-            // console.log("looking up symbol", node, node.graph.SYMBOLS)
+            console.log(`looking up symbol ${node.name} from `)
+            node.graph.dumpSymbols()
             const expr = node.graph.SYMBOLS[node.name]
-            if(!expr) rej(new Error("symbol not defined: " + node.name, node))
-            resolveValue(expr).then((ret)=>{
-                res(ret)
-            })
+            if(!expr) rej(new Error(`symbol not defined: ${node.name}`))
+            resolveValue(expr).then(ret=>res(ret))
         })
     }
     if(node.type === 'expression') {
@@ -308,7 +331,7 @@ function resolveValue(node) {
             })
         })
     }
-    throw new Error("got down here. bad")
+    throw new Error(`got down here. bad node type is ${node.type}`)
 }
 
 function printBranch(branch) {
@@ -323,6 +346,26 @@ function printBranch(branch) {
                 return inp+": "+obj.inputs[inp].name
             })
             console.log(`Exp: ${obj.name} ${inps.join(" ")}`)
+        }
+    })
+}
+
+function startBranch(branch) {
+    console.log('starting all startable functions',branch)
+    branch.nodes.forEach(node=>{
+        if(STARTABLE[node.name]) {
+            console.log("found startable",node.name)
+            STARTABLE[node.name].start(node)
+        }
+    })
+}
+
+function stopBranch(branch) {
+    console.log('stopping all startable functions',branch)
+    branch.nodes.forEach(node=>{
+        if(STARTABLE[node.name]) {
+            console.log("found startable",node.name)
+            STARTABLE[node.name].stop(node)
         }
     })
 }
@@ -352,7 +395,6 @@ test('single branch',(t) => {
     })
 })
 
-
 test('double branch',(t) =>{
     const srcs=[`5=>A`,`Add(op1:A,op2:5)`]
     const asts = srcs.map(toAST)
@@ -375,30 +417,37 @@ test('double branch',(t) =>{
     })
 })
 
-return
-
 test('random walk',t => {
     const srcs = [`Random() => A`]
     const asts = srcs.map(toAST)
     const graph = new Graph()
-    const branches = asts.map((ast)=>toGraph(graph,ast))
-    branches.map(evalBranch)
+    const branches = asts.map((ast)=>toGraphX(graph,ast))
     branches.map(printBranch)
 
     let count = 0
     branches[0].onChange(()=>{
-        console.log("value changed")
-        const val = evalBranch(branches[0])
-        console.log('new value is', val)
-        count++
-        if(count === 3) {
-            t.end()
-            branches.map(stopBranch)
-        }
+        console.log("branch changed")
+        evalBranch(branches[0]).then(val => {
+            console.log('new value is', val)
+            count++
+            if(count === 3) {
+                t.end()
+                Promise.all(branches.map(stopBranch)).then(() =>{
+                    console.log("all branches stopped")
+                })
+            }
+        })
     })
 
-    branches.map(startBranch)
+    Promise.all(branches.map(evalBranch)).then((values) =>{
+        console.log("evaluated branches with values",values)
+        return Promise.all(branches.map(startBranch))
+    }).then(()=>{
+        console.log("all branches started")
+    })
 })
+
+return
 
 test('slider',t=>{
     const srcs = [`Add(Slider(uuid:1,value:5),6)`]
