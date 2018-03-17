@@ -35,6 +35,11 @@ class Graph {
     markNodeDirty(node) {
         this.listeners.forEach((l)=>l(this))
     }
+    setSliderValue(node,value) {
+        console.log("the node is",node)
+        node.lastValue = value
+        this.markNodeDirty(node)
+    }
     onChange(l) {
         this.listeners.push(l)
     }

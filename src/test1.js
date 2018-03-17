@@ -65,27 +65,6 @@ Midi => Osc => ADSR => Sound
 */
 
 
-// const src = `5=>A Add(A,5)`
-//convert to AST
-//convert to graph
-//eval graph
-//print graph w/ current values
-//update the value of A
-//get event that something in the block was updated
-//eval graph
-//print graph w/ current values
-
-// const src1 = `5=>A`; const src2 = `Add(A,5)`
-//convert both to ASTs
-//convert both to graph branches in the same graph
-//eval both graph branches
-//print both branches w/ current values
-//change to 6=>A and update that branch
-//branch 2 should get event that something was updated
-//eval both graph branches
-//print both branches w/ current values
-
-
 const PREDEFINED_FUNCTIONS = {
     'Image': function(ctx, args) {
         console.log(`Making Image with size ${args.width}x${args.height}`)
@@ -131,17 +110,13 @@ const PREDEFINED_FUNCTIONS = {
     },
     'Slider': function(ctx, args) {
         console.log("making a slider")
-        return {
-            type:'input',
-            kind:'slider',
-            min:0,
-            max:100,
-            value: 20,
-            targetNode:ctx.node.id
-        }
+        // console.log("storing value in", ctx.node, args)
+        if(!ctx.node.lastValue) ctx.node.lastValue = args.value
+        console.log("using the last value", ctx.node.lastValue)
+        return ctx.node.lastValue
     },
     'Add': function(ctx, args) {
-        console.log('adding numbers together',args.o)
+        console.log('adding numbers together',args)
         return {
             type:'literal',
             value:args.op1 + args.op2
@@ -447,24 +422,28 @@ test('random walk',t => {
     })
 })
 
-return
-
 test('slider',t=>{
-    const srcs = [`Add(Slider(uuid:1,value:5),6)`]
+    const srcs = [`Add(op1:Slider(value:5),op2:6)`]
     const asts = srcs.map(toAST)
     const graph = new Graph()
-    const branches = asts.map((ast)=>toGraph(graph,ast))
-    branches.map(evalBranch)
+    const branches = asts.map((ast)=>toGraphX(graph,ast))
     branches.map(printBranch)
     branches[0].onChange(()=> {
         console.log("value changed")
-        const val = evalBranch(branches[0])
-        console.log('new value is', val)
-        t.equal(val,14)
-        t.end()
+        evalBranch(branches[0]).then((val)=>{
+            console.log("new values",val)
+            t.equal(val.value,14)
+            t.end()
+        })
     })
-    graph.setSliderValue(1,8)
+    Promise.all(branches.map(evalBranch)).then((values) =>{
+        console.log("evaluated branches with values",values)
+        const slider = Array.from(branches[0].nodes).find(n=>n.name === 'Slider')
+        graph.setSliderValue(slider,8)
+    })
 })
+
+return
 
 test('fake midi',t => {
     const srcs=[`Sound(signal:ADSR(input:Osc(freq:MIDI()), attack:1, decay:1, sustain:1, release:1))`]
