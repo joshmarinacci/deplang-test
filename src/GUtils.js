@@ -20,7 +20,7 @@ export const toAST = function (src) {
     const match = grammar.match(src)
     console.log('match is',match.succeeded())
     const sem = grammar.createSemantics().addOperation('toAST', {
-        Number: (a) => { return { type:'literal', value:parseInt(a.sourceString) } },
+        Number: (a) => { return { type:'literal', value:parseInt(a.sourceString,10) } },
         String: (_q1,str,_q2)  => { return { type:'literal', value:str.sourceString} },
         identifier: function(str, rest) { return { type:'identifier', value: this.sourceString }},
         Arguments: (a) => a.asIteration().toAST(),

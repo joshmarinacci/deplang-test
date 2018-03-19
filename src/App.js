@@ -1,9 +1,7 @@
 import React, { Component } from 'react';
 import ohm  from 'ohm-js'
-import Graph from "./Graph"
-import {toAST} from './GUtils'
 import './App.css';
-import ASTView from './ASTView'
+import InputPanel from './InputPanel'
 
 const grammar = ohm.grammar(`
     BasicSyntax {
@@ -159,41 +157,6 @@ function resolveValue(node) {
     console.log("ERROR: unrecognized type",node.type)
 }
 
-
-class InputPanel extends Component {
-    constructor(props) {
-        super(props)
-        this.state = {
-            source:`5=>A Add(op1:A, op2:5)`,
-            ast:null,
-        }
-    }
-    evaluate = () =>{
-        console.log("evaluating",this.state.source)
-        const ast = toAST(this.state.source)
-        this.setState({ast:ast})
-    }
-    edited = (e)=> this.setState({source:e.target.value})
-    keyPressed = (e) => {
-        if(e.keyCode === 13 && e.ctrlKey) {
-            e.preventDefault()
-            this.evaluate()
-        }
-    }
-    render() {
-        return (
-            <div className={'input-panel'}>
-                <textarea value={this.state.source}
-                          onChange={this.edited}
-                          rows={10} cols={80}
-                          onKeyDown={this.keyPressed}
-                />
-                <button onClick={this.evaluate}>evaluate</button>
-                <ASTView ast={this.state.ast}/>
-            </div>
-        );
-    }
-}
 
 class App extends Component {
     render() {
