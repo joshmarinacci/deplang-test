@@ -1,7 +1,9 @@
 import React, { Component } from 'react';
 import ohm  from 'ohm-js'
 import Graph from "./Graph"
+import {toAST} from './GUtils'
 import './App.css';
+import ASTView from './ASTView'
 
 const grammar = ohm.grammar(`
     BasicSyntax {
@@ -154,43 +156,25 @@ function resolveValue(node) {
             })
         })
     }
-
     console.log("ERROR: unrecognized type",node.type)
 }
 
-const src = `
-    'blue' => BLUE
-    Circle ( cx:25, cy:50, radius:20, fill:BLUE ) => circle1
-    Circle ( cx:75, cy:50, radius:20, fill:'green' ) => circle2
-    Image ( width: 100, height: 100 ) 
-        => Draw ( shapes:circle1 ) 
-        => Draw ( shapes:circle2 ) 
-`
 
 class InputPanel extends Component {
     constructor(props) {
         super(props)
         this.state = {
-            source:`Slider(value:50)=>A`,
-            output:'nothing',
-            graph:null,
+            source:`5=>A Add(op1:A, op2:5)`,
+            ast:null,
         }
     }
     evaluate = () =>{
         console.log("evaluating",this.state.source)
-        const graph = new Graph()
-        const sem = makeToGraphSemantics(graph,grammar)
-        const match = grammar.match(this.state.source)
-        const ret = sem(match).toGraph()
-        const last = ret[ret.length-1]
-        console.log("got the output",ret)
-        this.setState({
-            graph:graph,
-            value:ret
-        })
+        const ast = toAST(this.state.source)
+        this.setState({ast:ast})
     }
     edited = (e)=> this.setState({source:e.target.value})
-    keypressed = (e) => {
+    keyPressed = (e) => {
         if(e.keyCode === 13 && e.ctrlKey) {
             e.preventDefault()
             this.evaluate()
@@ -202,10 +186,10 @@ class InputPanel extends Component {
                 <textarea value={this.state.source}
                           onChange={this.edited}
                           rows={10} cols={80}
-                          onKeyDown={this.keypressed}
+                          onKeyDown={this.keyPressed}
                 />
                 <button onClick={this.evaluate}>evaluate</button>
-                <OutputPanel graph={this.state.graph} value={this.state.value}/>
+                <ASTView ast={this.state.ast}/>
             </div>
         );
     }
@@ -215,149 +199,8 @@ class App extends Component {
     render() {
         return <div id="main">
             <InputPanel key="1"/>
-            {/*<InputPanel key="2"/>*/}
         </div>
     }
 }
 
-class OutputPanel extends Component {
-    constructor(props) {
-        super(props)
-        this.state = {
-            value: null
-        }
-    }
-    componentWillMount() {
-        // console.log("mounting")
-    }
-    componentWillUnmount() {
-        // console.log("unmounting")
-    }
-    componentWillReceiveProps(props) {
-        console.log("got new props", props)
-        if(props.value) {
-            resolveValue(props.value).then((val) =>{
-                this.setState({value:val})
-            })
-            // if(props.value.type === 'symbolref') {
-            //     console.log("can resolve")
-            //     resolveValue(props.value).then((val)=>{
-            //         console.log("got the real value",val,this.div)
-            //         this.renderResult(val)
-            //     })
-            // }
-            // if(props.value.type === 'expression') {
-            //     console.log("must resolve an expression")
-            //     resolveValue(props.value).then((val)=>{
-            //         console.log("got the real value",val,this.div)
-            //         this.renderResult(val)
-            //     })
-            // }
-            // if(props.value.type === 'block') {
-            //     resolveValue(props.value).then((val)=>{
-            //         console.log("got the real value",val,this.div)
-            //         this.renderResult(val)
-            //     })
-            // }
-        }
-    }
-    // renderResult(val) {
-    //     while(this.div.firstChild) {
-    //         this.div.removeChild(this.div.firstChild)
-    //     }
-    //     // console.log("rendering",val, val instanceof Element)
-    //     if(val instanceof Element) {
-    //         this.div.appendChild(val)
-    //     }
-    // }
-
-    updatedSlider= (e) => {
-        console.log("new value is",parseFloat(e.target.value))
-        console.log("need to update", this.props.value)
-        console.log("the input is", this.state.value)
-    }
-    render() {
-        console.log("renderings",this.state.value)
-        if(this.state.value && this.state.value.type === 'input') {
-            return <input type="range" value={10} min={0} max={20} onChange={this.updatedSlider}/>
-        }
-        return <div>nothing</div>
-    }
-}
-
 export default App;
-
-// function doTest() {
-//     const graph = new Graph()
-//     console.log('before',graph.getObjectCount())
-//     const code = `'blue'=>BLUE`
-//     console.log("code is",code)
-//     const sem = makeToGraphSemantics(graph,grammar)
-//     const match = grammar.match(code)
-//     const ret = sem(match).toGraph()
-//     console.log('return value is', ret)
-//     console.log('after',graph.getObjectCount())
-//     const objs = new Set()
-//     collectObjects(ret, objs)
-//     console.log("collected",objs)
-// }
-
-// function collectObjects(root, objs) {
-//     console.log("type = ", root.type)
-//     if(root.type === 'block') {
-//         root.statements.forEach((n)=>collectObjects(n,objs))
-//     }
-//     if(root.type === 'statement') {
-//         collectObjects(root.first,objs)
-//         root.rest.forEach(n=>collectObjects(n,objs))
-//     }
-//     if(root.type === 'literal') {
-//         objs.add(root)
-//     }
-//     if(root.type === 'symbolref') {
-//         objs.add(root)
-//     }
-// }
-
-// doTest()
-
-
-/*
-Slider(min:0, max:10) => A
-A+5 => C
-
-make a block renderer to track each text area block of code
-also listens to changes on the graph
-also tracks the nodes created for that block
-when re-evaluating that block, remove the nodes, then evaluate the new ones.
-after evaluation, draw the output of the eval, which could be a number, string, canvas, or UI control
-after eval and re-render, need to tell everything else attached to the graph to re-evaluate lazily.
-
-
-
----
-8 => A
----
-9 => B
-add(A,B)
----
-
-
-* create graph. stored at the app level and passed into the input panel as a prop
-* evaluate the first block. creates literal and symbolref nodes
-* evaluate the second block. creates the literal and symbolref nodes, and expression node
-* send to output panel
-* resolves the value for the second block. produces the literal number 15
-* render the 15 in the output panel's output
-* edit the second block and evaluate.
-* remove the previous literal and symbolref nodes
-* add new literal and symbol ref nodes
-* mark that the graph has changed
-* second output panel is notified of a change. resolves the value again. should get a new value.
-
-
-
-
-
-
-*/
