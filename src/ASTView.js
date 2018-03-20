@@ -20,10 +20,10 @@ export default class ASTView extends Component {
         }
 
         if(ast.type === 'literal') {
-            return <div>Literal: <i>{ast.value}</i></div>
+            return <div><b>Literal</b>: <i>{ast.value}</i></div>
         }
         if(ast.type === 'identifier') {
-            return <div>identifier: <i>{ast.value}</i></div>
+            return <div><b>identifier</b>: <i>{ast.value}</i></div>
         }
         if(ast.type === 'funcall') {
             return <ul>

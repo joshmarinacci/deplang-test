@@ -1,6 +1,8 @@
-import {toAST} from './GUtils'
+import {toAST, toGraph} from './GUtils'
 import React, { Component } from 'react';
 import ASTView from './ASTView'
+import GraphView from './GraphView'
+import Graph from "./Graph"
 
 export default class InputPanel extends Component {
     constructor(props) {
@@ -13,7 +15,9 @@ export default class InputPanel extends Component {
     evaluate = () =>{
         console.log("evaluating",this.state.source)
         const ast = toAST(this.state.source)
-        this.setState({ast:ast})
+        const graph = new Graph()
+        const branch = toGraph(graph,ast)
+        this.setState({ast:ast, branch:branch, graph:graph})
     }
     edited = (e)=> this.setState({source:e.target.value})
     keyPressed = (e) => {
@@ -32,6 +36,7 @@ export default class InputPanel extends Component {
                 />
                 <button onClick={this.evaluate}>evaluate</button>
                 <ASTView ast={this.state.ast}/>
+                <GraphView graph={this.state.graph}/>
             </div>
         );
     }
