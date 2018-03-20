@@ -1,5 +1,90 @@
 import ohm  from 'ohm-js'
 
+const PREDEFINED_FUNCTIONS = {
+    'Image': function(ctx, args) {
+        console.log(`Making Image with size ${args.width}x${args.height}`)
+        const canvas = document.createElement('canvas')
+        canvas.width = args.width
+        canvas.height = args.height
+        return canvas
+    },
+    'Circle': function(ctx, args) {
+        return {
+            type:'circle',
+            cx:args.cx,
+            cy:args.cy,
+            radius:args.radius,
+            fill:args.fill
+        }
+    },
+    'Draw': function(ctx, args) {
+        console.log("pretending to draw")
+        let shape= args.shapes
+        let image = args.image
+        if(!image) image = args.input
+        if(!image) throw new Error("no image for the draw command")
+        console.log("  shapes", shape)
+        console.log("  image",image)
+
+        const c = image.getContext('2d')
+
+        const cir = shape
+        // c.fillRect(0,0,25,25)
+        c.fillStyle = cir.fill
+        c.beginPath()
+        c.arc(cir.cx,cir.cy,cir.radius, 0, 360)
+        c.closePath()
+        c.fill()
+        return image
+    },
+    'Save': function (ctx, args) {
+        console.log("pretending to save ")
+        console.log("  file ", args.filename)
+        console.log("  image", args.input)
+        return { type:'save-output'}
+    },
+    'Slider': function(ctx, args) {
+        console.log("making a slider")
+        // console.log("storing value in", ctx.node, args)
+        if(!ctx.node.lastValue) ctx.node.lastValue = args.value
+        console.log("using the last value", ctx.node.lastValue)
+        return ctx.node.lastValue
+    },
+    'Add': function(ctx, args) {
+        console.log('adding numbers together',args)
+        return {
+            type:'literal',
+            value:args.op1 + args.op2
+        }
+    },
+    'Random': function(ctx,args) {
+        console.log('generating a random number')
+        return {
+            type:'literal',
+            value:Math.random()
+        }
+    }
+}
+
+
+const STARTABLE = {
+    'Random':{
+        start: function(node) {
+            console.log("starting the random stream",node)
+            this.intervalid = setInterval(function(){
+                console.log('triggering')
+                node.graph.markNodeDirty(node)
+            },1000)
+        },
+        stop: function() {
+            console.log("stopping the random stream")
+            clearInterval(this.intervalid)
+        }
+    }
+}
+
+
+
 export const toAST = function (src) {
 
     const grammar = ohm.grammar(`
@@ -122,3 +207,36 @@ function convertToGraph(graph, ast, set) {
     throw new Error(`unknown AST node type: ${ast.type} `)
 }
 
+
+export const evalBranch = function (branch){
+    return resolveValue(branch.root)
+}
+
+function resolveValue(node) {
+    // console.log(`resolving ${node.type}`)
+    if(node.type === 'literal') return Promise.resolve(node.value)
+    if(node.type === 'symbolref') {
+        return new Promise((res,rej)=>{
+            console.log(`looking up symbol ${node.name} from `)
+            node.graph.dumpSymbols()
+            const expr = node.graph.SYMBOLS[node.name]
+            if(!expr) rej(new Error(`symbol not defined: ${node.name}`))
+            resolveValue(expr).then(ret=>res(ret))
+        })
+    }
+    if(node.type === 'expression') {
+        return new Promise((res, rej) => {
+            //it must be an expression
+            const proms = Object.keys(node.inputs).map((key) => resolveValue(node.inputs[key]))
+            return Promise.all(proms).then((rets) => {
+                const args = {}
+                Object.keys(node.inputs).forEach((key, i) => args[key] = rets[i])//resolveValue(node.inputs[key]))
+                const fun = PREDEFINED_FUNCTIONS[node.name]
+                console.log("calling function with node",node.id)
+                if (fun) res(fun({node:node}, args))
+                rej(new Error(`no defined function ${node.name}`))
+            })
+        })
+    }
+    throw new Error(`got down here. bad node type is ${node.type}`)
+}

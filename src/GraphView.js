@@ -3,12 +3,12 @@ import React, {Component} from "react"
 export default class GraphView extends Component {
     render() {
         if(this.props.graph) {
-            return <ul>{Object.keys(this.props.graph.objs).map((id)=>{
+            return <ul className="panel">{Object.keys(this.props.graph.objs).map((id)=>{
                 const obj = this.props.graph.objs[id]
                 return <li key={id}>{this.renderObj(obj)}</li>
             })}</ul>
         } else {
-            return <div>no graph view</div>
+            return <div className="panel">no graph view</div>
         }
     }
 

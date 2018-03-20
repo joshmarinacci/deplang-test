@@ -5,8 +5,14 @@ canvas {
 .input-panel {
   display: flex;
   flex-direction: row;
-  align-items: start;
+  /*align-items: start;*/
 }
 .input-panel textarea {
   padding: 0.5em;
+}
+
+
+.panel {
+  border: 1px solid black;
+  border-width: 0 1px 1px 0;
 }

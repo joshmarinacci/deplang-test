@@ -1,11 +1,10 @@
 import React, { Component } from 'react';
 export default class ASTView extends Component {
     render() {
-        console.log("rendeirng the ast",this.props.ast)
         if(this.props.ast) {
-            return this.renderAST(this.props.ast)
+            return <div className="panel">{this.renderAST(this.props.ast)}</div>
         } else {
-            return <div>no AST yet</div>
+            return <div className="panel">no AST yet</div>
         }
     }
 
