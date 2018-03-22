@@ -9,7 +9,7 @@ export default class InputPanel extends Component {
     constructor(props) {
         super(props)
         this.state = {
-            source:`5=>A Add(op1:A, op2:5)`,
+            source:`Slider(value:5)`,
             ast:null,
             branch:null,
             value:null
