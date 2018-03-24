@@ -2,7 +2,7 @@ import ohm  from 'ohm-js'
 
 const PREDEFINED_FUNCTIONS = {
     'Image': function(ctx, args) {
-        console.log(`Making Image with size ${args.width}x${args.height}`)
+        // console.log(`Making Image with size ${args.width}x${args.height}`)
         const canvas = document.createElement('canvas')
         canvas.width = args.width
         canvas.height = args.height
@@ -44,14 +44,25 @@ const PREDEFINED_FUNCTIONS = {
         return { type:'save-output'}
     },
     'Slider': function(ctx, args) {
-        console.log("making a slider")
-        // console.log("storing value in", ctx.node, args)
-        if(!ctx.node.lastValue) ctx.node.lastValue = args.value
-        console.log("using the last value", ctx.node.lastValue)
-        return ctx.node.lastValue
+        // console.log("making a slider", args.value, ctx.getStorageValue('value'))
+        if (!ctx.hasStorageValue('value')) {
+            ctx.setStorageValue('value', args.value)
+        }
+        ctx.createUIComponent({
+            type:'slider',
+            min:0,
+            max:100,
+            id:ctx.node.id,
+            value:ctx.getStorageValue('value')
+        })
+        return ctx.getStorageValue('value')
+        // return {
+        //     type: 'literal',
+        //     value: ctx.getStorageValue('value')
+        // }
     },
     'Add': function(ctx, args) {
-        console.log('adding numbers together',args)
+        // console.log('adding numbers together',args)
         return {
             type:'literal',
             value:args.op1 + args.op2
@@ -232,8 +243,27 @@ function resolveValue(node) {
                 const args = {}
                 Object.keys(node.inputs).forEach((key, i) => args[key] = rets[i])//resolveValue(node.inputs[key]))
                 const fun = PREDEFINED_FUNCTIONS[node.name]
-                console.log("calling function with node",node.id)
-                if (fun) res(fun({node:node}, args))
+                // console.log("calling function with node",node.id)
+                if(!node.storage) node.storage = {}
+                const ctx = {
+                    node:node,
+                    hasStorageValue: function(name) {
+                        return !!(node.storage[name]);
+                    },
+                    setStorageValue: function(name, value) {
+                        // console.log(`setting storage ${name} = ${value}`)
+                        node.storage[name] = value
+                    },
+                    getStorageValue: function(name) {
+                        // console.log(`getting storage ${name} = ${node.storage[name]}`)
+                        return node.storage[name]
+                    },
+                    createUIComponent: function(opts) {
+                        // console.log("creating UI component", opts)
+                        node.ui = opts
+                    }
+                }
+                if (fun) res(fun(ctx, args))
                 rej(new Error(`no defined function ${node.name}`))
             })
         })

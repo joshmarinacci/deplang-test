@@ -9,7 +9,7 @@ export default class InputPanel extends Component {
     constructor(props) {
         super(props)
         this.state = {
-            source:`Slider(value:5)`,
+            source:`Add(op1:Slider(value:5), op2: 8)`,
             ast:null,
             branch:null,
             value:null
@@ -20,6 +20,13 @@ export default class InputPanel extends Component {
         const ast = toAST(this.state.source)
         const graph = new Graph()
         const branch = toGraph(graph,ast)
+        graph.onChange(()=>{
+            // console.log("graph dirty, must re-evaluate")
+            evalBranch(branch).then((val)=>{
+                // console.log("the new value",val)
+                this.setState({value:val})
+            })
+        })
         evalBranch(branch).then((val)=>{
             this.setState({value:val})
         })
@@ -46,7 +53,7 @@ export default class InputPanel extends Component {
                 </div>
                 <ASTView ast={this.state.ast}/>
                 <GraphView graph={this.state.graph}/>
-                <ValueView value={this.state.value}/>
+                <ValueView graph={this.state.graph} value={this.state.value}/>
             </div>
         );
     }
