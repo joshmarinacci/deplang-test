@@ -199,6 +199,27 @@ function toAST(src) {
     return ret
 }
 
+function replaceBranch(graph, old_branch, ast) {
+    old_branch.nodes.forEach(obj => {
+        if(obj.type === 'literal') {
+            graph.removeLiteral(obj)
+        }
+        if(obj.type === 'symbolref') {
+            graph.removeSymbol(obj)
+        }
+        // if(obj.type === 'literal') console.log(`Lit: ${obj.value}`)
+        // if(obj.type === 'expression') {
+        //     const inps = Object.keys(obj.inputs).map((inp)=>{
+        //         return inp+": "+obj.inputs[inp].name
+        //     })
+        //     console.log(`Exp: ${obj.name} ${inps.join(" ")}`)
+        // }
+    })
+    const new_branch = toGraphX(graph,ast)
+    graph.fireChange()
+    return new_branch
+}
+
 function toGraphX(graph, root) {
     const set = new Set()
     const ret = toGraph(graph, root, set)
@@ -214,10 +235,9 @@ function toGraphX(graph, root) {
             this.listeners.push(l)
         }
     }
-    function chg(n) {
-        branch.nodeChanged(n)
-    }
-    graph.onChange(chg)
+
+    branch.listener = function(n) { branch.nodeChanged(n)}
+    graph.onChange(branch.listener)
     return branch
 }
 
@@ -344,6 +364,37 @@ function stopBranch(branch) {
         }
     })
 }
+
+test('replace one branch',(t) => {
+    const srcs=[`5=>A`,`Add(op1:A,op2:5)`]
+    const asts = srcs.map(toAST)
+    const graph = new Graph()
+    const branches = asts.map((ast)=>toGraphX(graph,ast))
+    branches.map(printBranch)
+    branches[0].onChange(()=>{
+        console.log("first branch changed")
+    })
+    branches[1].onChange(()=>{
+        console.log("second branch changed")
+        evalBranch(branches[1]).then((val)=>{
+            t.equal(val.value,11)
+            // t.end()
+        })
+    })
+    Promise.all(branches.map(evalBranch)).then((vals)=>{
+        t.equals(vals[1].value,10)
+        const src2 = `6=>A`
+        const ast2 = toAST(src2)
+        const old_branch = branches[0]
+        branches[0] = replaceBranch(graph,old_branch,ast2)
+        Promise.all(branches.map(evalBranch)).then((vals)=>{
+            t.equal(vals[1].value,11)
+            t.end()
+        })
+    })
+})
+
+return
 
 test('single branch',(t) => {
     const srcs=[`5=>A Add(op1:A, op2:5) `]// Add(A,5)

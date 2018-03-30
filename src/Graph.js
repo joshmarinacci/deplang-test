@@ -40,8 +40,17 @@ class Graph {
         node.lastValue = value
         this.markNodeDirty(node)
     }
+    removeLiteral(obj) {
+        delete this.objs[obj.id]
+    }
+    removeSymbol(obj) {
+        delete this.objs[obj.id]
+    }
     onChange(l) {
         this.listeners.push(l)
+    }
+    fireChange(b) {
+        this.listeners.forEach(l=>l(this))
     }
     findByName(name) {  return Object.values(this.objs).find((obj)=>obj.name === name)  }
 
