@@ -116,7 +116,7 @@ const PREDEFINED_FUNCTIONS = {
         return ctx.node.lastValue
     },
     'Add': function(ctx, args) {
-        console.log('adding numbers together',args)
+        // console.log('adding numbers together',args)
         return {
             type:'literal',
             value:args.op1 + args.op2
@@ -165,9 +165,9 @@ function toAST(src) {
         }
     `)
 
-    console.log('converting',src)
+    // console.log('converting',src)
     const match = grammar.match(src)
-    console.log('match is',match.succeeded())
+    // console.log('match is',match.succeeded())
     const sem = grammar.createSemantics().addOperation('toAST', {
         Number: (a) => { return { type:'literal', value:parseInt(a.sourceString) } },
         String: (_q1,str,_q2)  => { return { type:'literal', value:str.sourceString} },
@@ -206,6 +206,7 @@ function replaceBranch(graph, old_branch, ast) {
         }
         if(obj.type === 'symbolref') {
             graph.removeSymbol(obj)
+            graph.removeSymbolChange(obj.name,old_branch.changeHandler)
         }
         // if(obj.type === 'literal') console.log(`Lit: ${obj.value}`)
         // if(obj.type === 'expression') {
@@ -216,28 +217,43 @@ function replaceBranch(graph, old_branch, ast) {
         // }
     })
     const new_branch = toGraphX(graph,ast)
-    graph.fireChange()
+    new_branch.nodes.forEach((node)=>{
+        if(node.type === 'symbolref') {
+            graph.fireSymbolChange(node.name)
+        }
+    })
     return new_branch
 }
 
 function toGraphX(graph, root) {
     const set = new Set()
     const ret = toGraph(graph, root, set)
+    console.log("made",ret.id)
     const branch = {
         type: 'branch',
         root: ret,
         nodes: set,
         listeners: [],
-        nodeChanged: function (n) {
-            this.listeners.forEach(l => l(n))
-        },
+        // nodeChanged: function (n) {
+        //     this.listeners.forEach(l => l(n))
+        // },
         onChange: function (l) {
             this.listeners.push(l)
+        },
+        changeHandler: (sym)=>{
+            console.log("symbol changed",sym,ret.id)
+            branch.listeners.forEach(l=>l())
         }
     }
 
-    branch.listener = function(n) { branch.nodeChanged(n)}
-    graph.onChange(branch.listener)
+    set.forEach((node)=>{
+        // console.log("node in set",node.toString())
+        if(node.type === 'symbolref') {
+            console.log("listening to the symbol",node.name)
+            graph.onSymbolChange(node.name,branch.changeHandler)
+        }
+    })
+
     return branch
 }
 
@@ -250,15 +266,15 @@ function toGraph(graph, ast, set) {
     }
     if(ast.type === 'statement') {
         const rets = ast.parts.map((a)=>toGraph(graph,a,set))
-        console.log("need to bind the statement",rets.length)
+        // console.log("need to bind the statement",rets.length)
         if(rets.length >= 2) {
             for(let i=0; i<rets.length-1; i++) {
                 const A = rets[i]
                 const B = rets[i+1]
-                console.log(`adding connection for ${A} => ${B} `)
+                // console.log(`adding connection for ${A} => ${B} `)
                 if(B.type === 'identifier' || B.type === 'symbolref') {
                     graph.SYMBOLS[B.value] = A
-                    console.log(`setting the symbol ${B.value} to ${A}`)
+                    // console.log(`setting the symbol ${B.value} to ${A}`)
                 }
             }
         }
@@ -305,7 +321,7 @@ function resolveValue(node) {
     if(node.type === 'literal') return Promise.resolve(node.value)
     if(node.type === 'symbolref') {
         return new Promise((res,rej)=>{
-            console.log(`looking up symbol ${node.name} from `)
+            // console.log(`looking up symbol ${node.name} from `)
             node.graph.dumpSymbols()
             const expr = node.graph.SYMBOLS[node.name]
             if(!expr) rej(new Error(`symbol not defined: ${node.name}`))
@@ -320,7 +336,7 @@ function resolveValue(node) {
                 const args = {}
                 Object.keys(node.inputs).forEach((key, i) => args[key] = rets[i])//resolveValue(node.inputs[key]))
                 const fun = PREDEFINED_FUNCTIONS[node.name]
-                console.log("calling function with node",node.id)
+                // console.log("calling function with node",node.id)
                 if (fun) res(fun({node:node}, args))
                 rej(new Error(`no defined function ${node.name}`))
             })
@@ -366,11 +382,11 @@ function stopBranch(branch) {
 }
 
 test('replace one branch',(t) => {
-    const srcs=[`5=>A`,`Add(op1:A,op2:5)`]
+    const srcs=[`5=>A`,`Add(op1:A,op2:5)`,`Add(op1:1,op2:2)`]
     const asts = srcs.map(toAST)
     const graph = new Graph()
     const branches = asts.map((ast)=>toGraphX(graph,ast))
-    branches.map(printBranch)
+    // branches.map(printBranch)
     branches[0].onChange(()=>{
         console.log("first branch changed")
     })
@@ -381,14 +397,19 @@ test('replace one branch',(t) => {
             // t.end()
         })
     })
+    branches[2].onChange(()=>{
+        console.log("third branch changed")
+    })
     Promise.all(branches.map(evalBranch)).then((vals)=>{
         t.equals(vals[1].value,10)
         const src2 = `6=>A`
         const ast2 = toAST(src2)
         const old_branch = branches[0]
         branches[0] = replaceBranch(graph,old_branch,ast2)
+        //now re-evaluate. the other branches should already have been notified
         Promise.all(branches.map(evalBranch)).then((vals)=>{
-            t.equal(vals[1].value,11)
+            console.log("vals is",vals)
+            t.equal(vals[0],6)
             t.end()
         })
     })

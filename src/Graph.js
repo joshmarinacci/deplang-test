@@ -4,6 +4,7 @@ class Graph {
         this.SYMBOLS = {}
         this.count = 0
         this.listeners = []
+        this._symbolListeners = {}
     }
     makeInteractive(name,value) { return this.makeLiteral(name,value)  }
     genID(prefix) { return prefix + Math.floor(Math.random() * 10000) }
@@ -31,6 +32,16 @@ class Graph {
         // console.log("currently symbol is", this.SYMBOLS[name])
         this.SYMBOLS[name] = value
         this.listeners.forEach((l)=>l(this))
+    }
+    onSymbolChange(name,list) {
+        if(!this._symbolListeners[name]) this._symbolListeners[name] = []
+        this._symbolListeners[name].push(list)
+    }
+    fireSymbolChange(name) {
+        this._symbolListeners[name].forEach((l)=>l(name))
+    }
+    removeSymbolChange(name,list) {
+        this._symbolListeners[name] = this._symbolListeners[name].filter((l)=>l !== list)
     }
     markNodeDirty(node) {
         this.listeners.forEach((l)=>l(this))
