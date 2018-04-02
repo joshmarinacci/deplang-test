@@ -78,21 +78,21 @@ const PREDEFINED_FUNCTIONS = {
 }
 
 
-const STARTABLE = {
-    'Random':{
-        start: function(node) {
-            console.log("starting the random stream",node)
-            this.intervalid = setInterval(function(){
-                console.log('triggering')
-                node.graph.markNodeDirty(node)
-            },1000)
-        },
-        stop: function() {
-            console.log("stopping the random stream")
-            clearInterval(this.intervalid)
-        }
-    }
-}
+// const STARTABLE = {
+//     'Random':{
+//         start: function(node) {
+//             console.log("starting the random stream",node)
+//             this.intervalid = setInterval(function(){
+//                 console.log('triggering')
+//                 node.graph.markNodeDirty(node)
+//             },1000)
+//         },
+//         stop: function() {
+//             console.log("stopping the random stream")
+//             clearInterval(this.intervalid)
+//         }
+//     }
+// }
 
 
 
