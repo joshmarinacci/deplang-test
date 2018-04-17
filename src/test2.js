@@ -31,7 +31,6 @@ class Observable {
    // }
    evaluate() {
        if(typeof this.value === 'function') {
-           console.log("doing a function")
            const params = this.dependencies.map((o)=>o.evaluate())
            console.log("params",params)
            const val = this.value.apply(null,params)
@@ -179,9 +178,10 @@ test('evaluate using a symbol reference',(t) => {
     t.end()
 })
 
-return
 
 test('editing a block of code which eliminates a variable', t =>{
+    const EQUALS_FIRST = function() { return arguments[0]}
+    const EQUALS_LAST = function() { return arguments[arguments.length-1]}
     // {6=>A}, {A+5}
     // change it to 7=>B
     // verify invalid
@@ -189,69 +189,82 @@ test('editing a block of code which eliminates a variable', t =>{
     // verify it's valid again
     const symbols = new Symbols()
 
+
     //block one is 6=>A
     const code1 = new Observable('code1','{6=>A}')
     const six = new Observable('six',6)
     six.dependsOn(code1)
-    const adef = new Observable('A-def','A')
+    const adef = new Observable('A-def',EQUALS_LAST)
     adef.dependsOn(code1)
     adef.dependsOn(six)
 
-    symbols.listen('A',adef)
-    const block1 = new Observable('block1')
-    block1.depends(six,adef,symbols)
-    const val1 = new Observable('value1')
-    val1.depends(block1)
+    t.equals(adef.evaluate(),6)
+
+    symbols.setSymbolDef('A',adef)
+
+    const block1 = new Observable('block1',EQUALS_FIRST)
+    block1.dependsOn(six)
+    block1.dependsOn(adef)
+    const val1 = new Observable('value1',EQUALS_FIRST)
+    val1.dependsOn(block1)
 
     //block two is A+5
     const code2 = new Observable('A+5')
     const five = new Observable('five',5)
-    five.depends(code2)
-    const aref = new Observable('A-ref','A')
-    aref.depends(code2)
-    aref.depends(symbols)
+    five.dependsOn(code2)
+    const aref = new Observable('A-ref',EQUALS_LAST)
+    aref.dependsOn(code2)
+    symbols.setSymbolRef('A',aref)
+
+    t.equals(aref.evaluate(),6)
+
     const add = new Observable('add',function(a,b){return a+b})
-    add.depends(five,aref)
-    const block2 = new Observable()
-    block2.depends(five,aref,add,symbols)
-    const val2 = new Observable()
-    val2.depends(block2)
+    add.dependsOn(five,aref)
+    const block2 = new Observable('block2',EQUALS_LAST)
+    block2.dependsOn(five)
+    block2.dependsOn(aref)
+    block2.dependsOn(add)
+    const val2 = new Observable('value2',EQUALS_FIRST)
+    val2.dependsOn(block2)
 
     // the gui updates when anything changes
     const GUI = new Observable('GUI')
-    GUI.depends(block1,block2)
+    GUI.dependsOn(block1,block2)
 
     //verify everything works
     t.equals(val1.evaluate(),6)
     t.equals(val2.evaluate(),11)
 
-    //update code to be {7=>B}
-    code1.update('{7=>B')
-    const seven = new Observable('seven',7)
-    seven.depends(code1)
-    const bdef = new Observable('B-def','B')
-    bdef.depends(code1,seven)
+    return t.end()
 
-    symbols.listen('B',bdef)
-    six.markInvalid()
-    adef.markInvalid()
-    t.isFalse(val1.isInvalid())
-    t.isTrue(block2.isDirty())
-    t.isTrue(val2.isDirty())
-    t.isTrue(val2.isInvalid())
-    t.isTrue(add.isInvalid())
-    t.isTrue(add.isDirty())
+
+    //update code to be {7=>B}
+    // code1.update('{7=>B')
+    // const seven = new Observable('seven',7)
+    // seven.depends(code1)
+    // const bdef = new Observable('B-def','B')
+    // bdef.depends(code1,seven)
+
+    // symbols.listen('B',bdef)
+    // six.markInvalid()
+    // adef.markInvalid()
+    // t.isFalse(val1.isInvalid())
+    // t.isTrue(block2.isDirty())
+    // t.isTrue(val2.isDirty())
+    // t.isTrue(val2.isInvalid())
+    // t.isTrue(add.isInvalid())
+    // t.isTrue(add.isDirty())
 
 
     //now fix the code
-    code1.update('{7=>A}')
-    adef.depends(code1,seven)
-    t.equals(add.isInvalid(),false)
-    t.equals(add.isDirty(),true)
-    t.equals(add.evaluate(),12)
-    t.equals(add.isDirty(),false)
-    t.equals(GUI.isDirty(),true)
+    // code1.update('{7=>A}')
+    // adef.depends(code1,seven)
+    // t.equals(add.isInvalid(),false)
+    // t.equals(add.isDirty(),true)
+    // t.equals(add.evaluate(),12)
+    // t.equals(add.isDirty(),false)
+    // t.equals(GUI.isDirty(),true)
 
-    t.equals(GUI.evaluate(),[7,12])
+    // t.equals(GUI.evaluate(),[7,12])
 
 })
