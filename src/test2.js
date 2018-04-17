@@ -17,18 +17,19 @@ class Observable {
        })
    }
 
+   clearDeps() {
+       this.dependencies.forEach((arg)=>{
+           arg.listeners = arg.listeners.filter(n => n !== this)
+       })
+       this.dependencies = []
+   }
+
    isDirty() {
        return this.dirty
    }
-   // markDirty() {
-   //     this.dirty = true
-   // }
-   // markInvalid() {
-   //     this.valid = false
-   // }
-   // getDependents() {
-   //     return this.listeners
-   // }
+   isInvalid() {
+       return this.invalid
+   }
    evaluate() {
        if(typeof this.value === 'function') {
            const params = this.dependencies.map((o)=>o.evaluate())
@@ -36,20 +37,19 @@ class Observable {
            const val = this.value.apply(null,params)
            console.log("result is",val)
            this.dirty = false
+           this.invalid = false
            return val
        }
 
        const params = this.dependencies.map((o)=>o.evaluate())
        this.dirty = false
+       this.invalid = false
        return this.value
    }
    update(value) {
        this.value = value
        this.markDirty()
    }
-   // isValid() {
-   //     return this.valid
-   // }
     markDirty() {
         this.dirty = true
         this.listeners.forEach(l=>l.markDirty())
@@ -59,23 +59,28 @@ class Observable {
        console.log(prefix + this.name,'=',this.value)
         this.dependencies.forEach((d)=>d.dumpChain(prefix+'  '))
     }
+
+    markInvalid() {
+        this.invalid = true
+        this.listeners.forEach(l=>l.markInvalid())
+    }
 }
 
 
-// test('basic expression evaluation',(t)=>{
-//     const code = new Observable("code","1+2")
-//     const one = new Observable('one',1)
-//     one.dependsOn(code)
-//     const two = new Observable('two',2)
-//     two.dependsOn(code)
-//     const add  = new Observable('addition',function(a,b) { return a+b })
-//     add.dependsOn(one,two)
-//     t.equals(code.evaluate(),'1+2')
-//     t.equals(one.evaluate(),1)
-//     t.equals(two.evaluate(),2)
-//     t.equals(add.evaluate(),3)
-//     t.end()
-// })
+test('basic expression evaluation',(t)=>{
+    const code = new Observable("code","1+2")
+    const one = new Observable('one',1)
+    one.dependsOn(code)
+    const two = new Observable('two',2)
+    two.dependsOn(code)
+    const add  = new Observable('addition',function(a,b) { return a+b })
+    add.dependsOn(one,two)
+    t.equals(code.evaluate(),'1+2')
+    t.equals(one.evaluate(),1)
+    t.equals(two.evaluate(),2)
+    t.equals(add.evaluate(),3)
+    t.end()
+})
 
 class Symbols {
     constructor() {
@@ -88,6 +93,7 @@ class Symbols {
     }
     setSymbolDef(name,ob) {
         const sym = this._getSymbol(name)
+        sym.clearDeps()
         sym.dependsOn(ob)
     }
     isSymbolDirty(name) {
@@ -182,6 +188,9 @@ test('evaluate using a symbol reference',(t) => {
 test('editing a block of code which eliminates a variable', t =>{
     const EQUALS_FIRST = function() { return arguments[0]}
     const EQUALS_LAST = function() { return arguments[arguments.length-1]}
+    const EQUALS_ALL = function() {
+        return Array.prototype.slice.call(arguments)
+    }
     // {6=>A}, {A+5}
     // change it to 7=>B
     // verify invalid
@@ -228,43 +237,72 @@ test('editing a block of code which eliminates a variable', t =>{
     val2.dependsOn(block2)
 
     // the gui updates when anything changes
-    const GUI = new Observable('GUI')
-    GUI.dependsOn(block1,block2)
+    const GUI = new Observable('GUI',EQUALS_ALL)
+    GUI.dependsOn(block1)
+    GUI.dependsOn(block2)
 
     //verify everything works
     t.equals(val1.evaluate(),6)
     t.equals(val2.evaluate(),11)
 
-    return t.end()
-
 
     //update code to be {7=>B}
-    // code1.update('{7=>B')
-    // const seven = new Observable('seven',7)
-    // seven.depends(code1)
-    // const bdef = new Observable('B-def','B')
-    // bdef.depends(code1,seven)
+    // code1.markInvalid() could this replace the six and adef mark invalids?
+    code1.update('{7=>B}')
+    block1.clearDeps()
+    //mark the old nodes invalid
+    six.markInvalid()
+    adef.markInvalid()
+    //make the new ones
+    const seven = new Observable('seven',7)
+    seven.dependsOn(code1)
+    const bdef = new Observable('B-def',EQUALS_LAST)
+    bdef.dependsOn(code1)
+    bdef.dependsOn(seven)
+    block1.dependsOn(seven)
+    block1.dependsOn(bdef)
+    symbols.setSymbolDef('B',bdef)
 
-    // symbols.listen('B',bdef)
-    // six.markInvalid()
-    // adef.markInvalid()
-    // t.isFalse(val1.isInvalid())
-    // t.isTrue(block2.isDirty())
-    // t.isTrue(val2.isDirty())
-    // t.isTrue(val2.isInvalid())
-    // t.isTrue(add.isInvalid())
-    // t.isTrue(add.isDirty())
+    //the old nodes are invalid, but val1 should still be valid
+    t.true(six.isInvalid())
+    t.true(adef.isInvalid())
+    t.false(val1.isInvalid())
+
+
+    //val1 and val2 should both be dirty, though
+    t.true(val1.isDirty())
+    t.true(val2.isDirty())
+
+    //add should be invalid, because it depends on something invalid
+    t.true(add.isInvalid())
+    t.true(add.isDirty())
 
 
     //now fix the code
-    // code1.update('{7=>A}')
-    // adef.depends(code1,seven)
-    // t.equals(add.isInvalid(),false)
-    // t.equals(add.isDirty(),true)
-    // t.equals(add.evaluate(),12)
-    // t.equals(add.isDirty(),false)
-    // t.equals(GUI.isDirty(),true)
+    code1.update('{7=>A}')
+    block1.clearDeps()
+    //make the old nodes invalid
+    seven.markInvalid()
+    bdef.markInvalid()
+    //make the new nodes
+    const seven_b = new Observable('seven-b',7)
+    seven_b.dependsOn(code1)
+    const adef_b = new Observable('A-def',EQUALS_LAST)
+    adef_b.dependsOn(code1)
+    adef_b.dependsOn(seven_b)
+    block1.dependsOn(seven_b)
+    block1.dependsOn(adef_b)
+    symbols.setSymbolDef('A',adef_b)
 
-    // t.equals(GUI.evaluate(),[7,12])
+
+    t.true(add.isDirty())
+    t.equals(add.isInvalid(),true)
+    t.equals(add.evaluate(),12)
+    t.equals(add.isInvalid(),false)
+    t.equals(add.isDirty(),false)
+    t.equals(GUI.isDirty(),true)
+
+    t.deepEqual(GUI.evaluate(),[7,12])
+    return t.end()
 
 })
