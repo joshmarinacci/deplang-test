@@ -22,7 +22,7 @@ export default class ValueView extends Component {
         if (!graph) return ""
         const uis = Object.keys(graph.objs).map((id) => {
             const node = graph.objs[id]
-            if(!node.ui) return
+            if(!node.ui) return ""
             if(node.ui.type === 'slider') {
                 return <div key={id}>
                     <input type="range" value={node.ui.value}
@@ -35,6 +35,7 @@ export default class ValueView extends Component {
                     <label>{node.ui.value}</label>
                 </div>
             }
+            return "unknown type"
         })
         return <div>uis {uis}</div>
     }
