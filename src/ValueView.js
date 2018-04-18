@@ -4,7 +4,7 @@ export default class ValueView extends Component {
     render() {
         if(this.props.value) {
             return <div className="panel">
-                {this.renderGraphComponents(this.props.graph)}
+                {/*{this.renderGraphComponents(this.props.graph)}*/}
                 {this.renderValue(this.props.value)}
                 </div>
         } else {
@@ -13,6 +13,9 @@ export default class ValueView extends Component {
     }
 
     renderValue(value) {
+        if(typeof value === 'number') {
+            return <span>{value}</span>
+        }
         if(value.type === 'literal') {
             return <span>{value.value}</span>
         }

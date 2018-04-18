@@ -66,22 +66,6 @@ class Observable {
     }
 }
 
-
-test('basic expression evaluation',(t)=>{
-    const code = new Observable("code","1+2")
-    const one = new Observable('one',1)
-    one.dependsOn(code)
-    const two = new Observable('two',2)
-    two.dependsOn(code)
-    const add  = new Observable('addition',function(a,b) { return a+b })
-    add.dependsOn(one,two)
-    t.equals(code.evaluate(),'1+2')
-    t.equals(one.evaluate(),1)
-    t.equals(two.evaluate(),2)
-    t.equals(add.evaluate(),3)
-    t.end()
-})
-
 class Symbols {
     constructor() {
         this._symbols = {}
@@ -110,6 +94,22 @@ class Symbols {
     }
 
 }
+
+test('basic expression evaluation',(t)=>{
+    const code = new Observable("code","1+2")
+    const one = new Observable('one',1)
+    one.dependsOn(code)
+    const two = new Observable('two',2)
+    two.dependsOn(code)
+    const add  = new Observable('addition',function(a,b) { return a+b })
+    add.dependsOn(one,two)
+    t.equals(code.evaluate(),'1+2')
+    t.equals(one.evaluate(),1)
+    t.equals(two.evaluate(),2)
+    t.equals(add.evaluate(),3)
+    t.end()
+})
+
 
 /*
 an object def defines a symbol's value
