@@ -13,6 +13,9 @@ export default class ValueView extends Component {
     }
 
     renderValue(value) {
+        if(value instanceof Error) {
+            return <span>error</span>
+        }
         if(typeof value === 'number') {
             return <span>{value}</span>
         }

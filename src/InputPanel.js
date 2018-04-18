@@ -3,72 +3,7 @@ import React, { Component } from 'react';
 // import ASTView from './ASTView'
 // import GraphView from './GraphView'
 import ValueView from './ValueView'
-
-class Observable {
-    constructor(name, value) {
-        this.name = name
-        this.value = value
-        this.listeners = []
-        this.dependencies = []
-        this.dirty = true
-        this.valid = true
-    }
-    dependsOn() {
-        const args = Array.prototype.slice.apply(arguments)
-        args.forEach((arg)=>{
-            arg.listeners.push(this)
-            this.dependencies.push(arg)
-        })
-    }
-
-    clearDeps() {
-        this.dependencies.forEach((arg)=>{
-            arg.listeners = arg.listeners.filter(n => n !== this)
-        })
-        this.dependencies = []
-    }
-
-    isDirty() {
-        return this.dirty
-    }
-    isInvalid() {
-        return this.invalid
-    }
-    evaluate() {
-        if(typeof this.value === 'function') {
-            const params = this.dependencies.map((o)=>o.evaluate())
-            // console.log("params",params)
-            const val = this.value.apply(null,params)
-            // console.log("result is",val)
-            this.dirty = false
-            this.invalid = false
-            return val
-        }
-
-        const params = this.dependencies.map((o)=>o.evaluate())
-        this.dirty = false
-        this.invalid = false
-        return this.value
-    }
-    update(value) {
-        this.value = value
-        this.markDirty()
-    }
-    markDirty() {
-        this.dirty = true
-        this.listeners.forEach(l=>l.markDirty())
-    }
-    dumpChain(prefix) {
-        if(!prefix) prefix = ''
-        console.log(prefix + this.name,'=',this.value)
-        this.dependencies.forEach((d)=>d.dumpChain(prefix+'  '))
-    }
-
-    markInvalid() {
-        this.invalid = true
-        this.listeners.forEach(l=>l.markInvalid())
-    }
-}
+import Observable from './Observable'
 
 const EQUALS_FIRST = function() { return arguments[0]}
 const EQUALS_LAST = function() { return arguments[arguments.length-1]}
@@ -112,6 +47,8 @@ export default class InputPanel extends Component {
         //mark the old nodes invalid
         this.nodes.forEach(n => n.markInvalid())
         this.makeNodes(ast)
+        // this.val.dumpChain()
+        // this.props.symbols.dump()
         this.setState({value:this.val.evaluate()})
     }
     edited = (e)=> this.setState({source:e.target.value})
@@ -186,15 +123,15 @@ export default class InputPanel extends Component {
             console.log("it is a function call")
             const params = ast.params.map((p)=>this.makeNodes(p))
             const id = ast.id.value
-            console.log("making function",id,params)
+            // console.log("making function",id,params)
             const add = this.makeAddFunction(params[0].value, params[1].value)
             this.nodes.push(add)
             return add
         }
 
         if(ast.type === 'parameter') {
-            console.log("parameter name",ast.name)
-            console.log("value",ast.value)
+            // console.log("parameter name",ast.name)
+            // console.log("value",ast.value)
             const value = this.makeNodes(ast.value)
             return {
                 name:ast.name,
