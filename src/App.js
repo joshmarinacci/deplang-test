@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import './App.css';
 import InputPanel from './InputPanel'
-import Graph from "./Graph"
+// import Graph from "./Graph"
 
 
 class Observable {
@@ -105,7 +105,7 @@ class App extends Component {
         this.state = {
             sources: [
                 `6=>A`,
-                `A+5`,
+                `Add(op1:A, op2:5)`,
                 // `Add(op1:Slider(value:2), op2: 3)`,
                 // `4`
             ],
