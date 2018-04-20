@@ -19,6 +19,18 @@ export default class InputPanel extends Component {
         this.block = new Observable('block',EQUALS_LAST)
         this.val = new Observable('val',EQUALS_LAST)
         this.val.dependsOn(this.block)
+        const self = this
+        this.val.listeners.push({
+            markDirty() {
+                console.log("the value is dirty", self.state.source)
+                setTimeout(()=>{
+                    self.setState({value:self.val.evaluate()})
+                },0)
+            },
+            markInvalid() {
+                console.log("the value is invalid",self.state.source)
+            }
+        })
         this.nodes = []
     }
     makeLiteral(val) {
@@ -49,7 +61,6 @@ export default class InputPanel extends Component {
         this.makeNodes(ast)
         // this.val.dumpChain()
         // this.props.symbols.dump()
-        this.setState({value:this.val.evaluate()})
     }
     edited = (e)=> this.setState({source:e.target.value})
     keyPressed = (e) => {
